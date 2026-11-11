@@ -12,8 +12,8 @@ using Unity.Services.Relay.Models;
 using UnityEngine;
 
 /// <summary>
-/// Basic public matchmaking prototype using Unity Lobby + Relay + Netcode for GameObjects.
-/// Requires the matching Unity packages and a NetworkManager with UnityTransport in the scene.
+/// Public matchmaking using Unity Lobby + Relay + Netcode for GameObjects.
+/// Requires a NetworkManager with UnityTransport in the scene.
 /// </summary>
 public class UnityNetcodeMatchmaking : MonoBehaviour
 {
@@ -21,16 +21,20 @@ public class UnityNetcodeMatchmaking : MonoBehaviour
     [SerializeField] private string lobbyName = "Rocket League Mobile";
     private Lobby currentLobby;
     private Coroutine heartbeat;
+    private bool starting;
 
     public async void FindRandomMatch()
     {
+        if (starting || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening))
+            return;
+
+        starting = true;
         try
         {
             await InitializeServices();
-
             var query = await LobbyService.Instance.QueryLobbiesAsync(new QueryLobbiesOptions
             {
-                Count = 10,
+                Count = 20,
                 Filters = new List<QueryFilter>
                 {
                     new QueryFilter(QueryFilter.FieldOptions.AvailableSlots, "0", QueryFilter.OpOptions.GT)
@@ -39,19 +43,27 @@ public class UnityNetcodeMatchmaking : MonoBehaviour
 
             foreach (var lobby in query.Results)
             {
-                if (lobby.Data != null && lobby.Data.ContainsKey("RelayJoinCode"))
+                if (lobby.Data == null || !lobby.Data.ContainsKey("RelayJoinCode"))
+                    continue;
+
+                try
                 {
-                    try
+                    currentLobby = await LobbyService.Instance.JoinLobbyByIdAsync(lobby.Id);
+                    await JoinRelayMatch(currentLobby.Data["RelayJoinCode"].Value);
+                    Debug.Log("Joined public match: " + currentLobby.Name);
+                    return;
+                }
+                catch (System.Exception joinError)
+                {
+                    Debug.LogWarning("Could not join lobby " + lobby.Id + ": " + joinError.Message);
+                    if (currentLobby != null)
                     {
-                        currentLobby = await LobbyService.Instance.JoinLobbyByIdAsync(lobby.Id);
-                        string code = currentLobby.Data["RelayJoinCode"].Value;
-                        await JoinRelayMatch(code);
-                        Debug.Log("Joined public match: " + currentLobby.Name);
-                        return;
-                    }
-                    catch (LobbyServiceException)
-                    {
-                        // Lobby filled or expired while we were joining; try another.
+                        try
+                        {
+                            await LobbyService.Instance.RemovePlayerAsync(currentLobby.Id, AuthenticationService.Instance.PlayerId);
+                        }
+                        catch { }
+                        currentLobby = null;
                     }
                 }
             }
@@ -61,6 +73,10 @@ public class UnityNetcodeMatchmaking : MonoBehaviour
         catch (System.Exception exception)
         {
             Debug.LogError("Matchmaking failed: " + exception.Message);
+        }
+        finally
+        {
+            starting = false;
         }
     }
 
@@ -76,17 +92,21 @@ public class UnityNetcodeMatchmaking : MonoBehaviour
             throw new System.Exception("Add a NetworkManager with UnityTransport to the gameplay scene.");
     }
 
+    private UnityTransport GetTransport()
+    {
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport == null)
+            throw new System.Exception("Add UnityTransport to the NetworkManager.");
+        return transport;
+    }
+
     private async Task CreatePublicMatch()
     {
         int capacity = Mathf.Clamp(maxPlayers, 2, 16);
         Allocation allocation = await RelayService.Instance.CreateAllocationAsync(capacity - 1);
         string joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
 
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        if (transport == null)
-            throw new System.Exception("Add UnityTransport to the NetworkManager.");
-
-        transport.SetRelayServerData(
+        GetTransport().SetRelayServerData(
             allocation.RelayServer.IpV4,
             (ushort)allocation.RelayServer.Port,
             allocation.AllocationIdBytes,
@@ -105,7 +125,11 @@ public class UnityNetcodeMatchmaking : MonoBehaviour
             });
 
         if (!NetworkManager.Singleton.StartHost())
+        {
+            await LobbyService.Instance.DeleteLobbyAsync(currentLobby.Id);
+            currentLobby = null;
             throw new System.Exception("Netcode could not start the host.");
+        }
 
         heartbeat = StartCoroutine(SendLobbyHeartbeat());
         Debug.Log("Public match created. Lobby ID: " + currentLobby.Id);
@@ -114,12 +138,7 @@ public class UnityNetcodeMatchmaking : MonoBehaviour
     private async Task JoinRelayMatch(string joinCode)
     {
         JoinAllocation allocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
-
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        if (transport == null)
-            throw new System.Exception("Add UnityTransport to the NetworkManager.");
-
-        transport.SetRelayServerData(
+        GetTransport().SetRelayServerData(
             allocation.RelayServer.IpV4,
             (ushort)allocation.RelayServer.Port,
             allocation.AllocationIdBytes,
@@ -165,7 +184,6 @@ public class UnityNetcodeMatchmaking : MonoBehaviour
             {
                 Debug.LogWarning("Lobby leave notice: " + exception.Message);
             }
-
             currentLobby = null;
         }
     }
