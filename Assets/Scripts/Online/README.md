@@ -1,9 +1,9 @@
-# Online multiplayer (no Photon)
+# Online multiplayer — Unity Netcode (no Photon)
 
-This prototype uses **Unity Netcode for GameObjects + Unity Lobby + Unity Relay**. Players can search for a public lobby from inside the iPhone game; no website needs to be opened.
+The online prototype uses **Netcode for GameObjects + Unity Lobby + Unity Relay**. Players search for a public match inside the iPhone game; no website is needed.
 
-## Required Unity packages
-Install compatible versions of:
+## Install packages
+In Unity Package Manager, install compatible versions of:
 - Netcode for GameObjects
 - Unity Transport
 - Authentication
@@ -11,23 +11,27 @@ Install compatible versions of:
 - Lobby
 - Relay
 
-Enable these services for the Unity project in the Unity Dashboard. Unity services may require a Unity project linked to an account and may have usage limits or pricing; check current terms before release.
+Link the Unity project to a Unity Dashboard project and enable Lobby and Relay. Check Unity's current service limits and terms before release.
 
 ## Scene setup
-1. Add a **NetworkManager** GameObject to the gameplay scene.
-2. Add **UnityTransport** to that same GameObject and assign it as the NetworkManager's network transport.
-3. Add an empty GameObject named `OnlineMatchmaking` and attach `UnityNetcodeMatchmaking.cs`.
-4. Add a UI object with `OnlineMenuButton.cs` and assign the matchmaking object.
-5. Connect the Online Play button to `OnFindMatchPressed` and the Leave button to `OnLeaveMatchPressed`.
-6. Add the gameplay scene to Build Settings.
+1. Add a `NetworkManager` to the gameplay scene.
+2. Add `UnityTransport` to that same object and assign it as NetworkManager's transport.
+3. Add an `OnlineMatchmaking` object with `UnityNetcodeMatchmaking.cs`.
+4. Add `OnlineMenuButton.cs` to a UI object, assign the matchmaking object, and connect the Online Play and Leave buttons.
+5. Add a scene object with `NetworkObject` and `NetworkedMatchState.cs`.
+6. Create a car Player Prefab with `NetworkObject`, `NetworkTransform`, `NetworkRigidbody`, `Rigidbody`, and `NetworkedCarController.cs`. Assign it to NetworkManager > Player Prefab. The NetworkManager will spawn one owned car per joining player.
+7. Add `NetworkedPlayerSetup.cs` to the car prefab if you want to enable a local-only camera. Assign the camera and local-only behaviours.
+8. Create the ball prefab with `NetworkObject`, `NetworkTransform`, `NetworkRigidbody`, `Rigidbody`, the Ball tag, and `NetworkedBall.cs`. Spawn it as a network object from the server or place it as a scene NetworkObject.
+9. Add `NetworkedGoal.cs` to each goal trigger. Set scoringTeam to 0 for blue or 1 for orange, and assign the scene match state and ball.
+10. Optional: add `NetworkedMatchHUD.cs` to a UI object and assign the score and timer Text labels.
+11. Add the gameplay scene to Build Settings. Test with multiple devices.
 
-The matchmaking script searches public lobbies with free slots. If it finds one, it joins through its Relay join code; otherwise it creates a public lobby and hosts a Relay session.
+## Mobile controls
+For each touch button, attach `MobileHoldButton.cs`, choose its Control value, and assign the local player's `NetworkedCarController` to Network Target. The local camera and controls should only be enabled for the owning player.
 
-## Still required for real multiplayer
-- Add NetworkObject and NetworkTransform (or equivalent networked movement) to the car prefab.
-- Spawn a car for each connected player.
-- Synchronise ball physics, boost, goals, score and match timer.
-- Add ownership checks, disconnect handling, server-authoritative scoring and abuse protection.
-- Test on multiple devices and networks.
-
-**Status:** integration starter only. This does not yet make the existing car and ball gameplay network-synchronised, and it is not an IPA or finished online game.
+## Important implementation notes
+- The server simulates car and ball physics; NetworkTransform / NetworkRigidbody replicate the state.
+- This is a starter implementation. Add a robust player spawn point/team assignment, reconnection, latency handling, anti-cheat checks, match cleanup and production UI before release.
+- Verify that the installed Netcode package version supports the APIs used by the scripts. The code uses Unity 6 Rigidbody.linearVelocity.
+- Unity Lobby/Relay requires Unity services setup and internet access. Usage limits and pricing can change.
+- This repository still needs a complete Unity project (scenes, prefabs, ProjectSettings and package manifest) and an iOS build/signing process before it can produce an installable IPA.
