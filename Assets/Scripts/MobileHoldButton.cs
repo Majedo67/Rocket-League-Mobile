@@ -6,6 +6,7 @@ public class MobileHoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHa
     public enum Control { Accelerate, Reverse, Left, Right, Boost }
     public Control control;
     public CarController target;
+    public NetworkedCarController networkTarget;
 
     public void OnPointerDown(PointerEventData eventData) => SetPressed(true);
     public void OnPointerUp(PointerEventData eventData) => SetPressed(false);
@@ -13,27 +14,39 @@ public class MobileHoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHa
 
     private void SetPressed(bool pressed)
     {
-        if (target == null) return;
+        float throttle = 0f;
+        float steering = 0f;
+        bool boost = false;
 
         switch (control)
         {
-            case Control.Accelerate:
-                target.throttle = pressed ? 1f : 0f;
-                break;
-            case Control.Reverse:
-                target.throttle = pressed ? -1f : 0f;
-                break;
-            case Control.Left:
-                target.steering = pressed ? -1f : 0f;
-                break;
-            case Control.Right:
-                target.steering = pressed ? 1f : 0f;
-                break;
-            case Control.Boost:
-                target.boostPressed = pressed;
-                break;
+            case Control.Accelerate: throttle = pressed ? 1f : 0f; break;
+            case Control.Reverse: throttle = pressed ? -1f : 0f; break;
+            case Control.Left: steering = pressed ? -1f : 0f; break;
+            case Control.Right: steering = pressed ? 1f : 0f; break;
+            case Control.Boost: boost = pressed; break;
+        }
+
+        if (target != null)
+        {
+            if (control == Control.Accelerate || control == Control.Reverse)
+                target.throttle = throttle;
+            else if (control == Control.Left || control == Control.Right)
+                target.steering = steering;
+            else if (control == Control.Boost)
+                target.boostPressed = boost;
+        }
+
+        if (networkTarget != null)
+        {
+            if (control == Control.Accelerate || control == Control.Reverse)
+                networkTarget.SetMobileThrottle(throttle);
+            else if (control == Control.Left || control == Control.Right)
+                networkTarget.SetMobileSteering(steering);
+            else if (control == Control.Boost)
+                networkTarget.SetMobileBoost(boost);
         }
     }
 
-    void OnDisable() => SetPressed(false);
+    private void OnDisable() => SetPressed(false);
 }
