@@ -1,0 +1,51 @@
+name: iOS IPA Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "Assets/**"
+      - "Packages/**"
+      - "ProjectSettings/**"
+      - ".github/workflows/build.yml"
+
+jobs:
+  build-ios:
+    name: Build Unity iOS project
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Build Xcode project with Unity
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: iOS
+          unityVersion: 6000.0.42f1
+          buildName: RocketLeagueMobile
+          buildsPath: build
+          allowDirtyBuild: true
+
+      - name: Upload unsigned Xcode project
+        if: ${{ always() && hashFiles('build/iOS/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rocket-League-Mobile-iOS-Xcode
+          path: build/iOS
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Explain IPA signing requirements
+        if: ${{ success() }}
+        run: |
+          echo "Unity iOS export completed."
+          echo "An installable IPA still requires an Apple Distribution certificate and provisioning profile."
+          echo "This workflow intentionally does not create or claim an installable IPA without those credentials."
