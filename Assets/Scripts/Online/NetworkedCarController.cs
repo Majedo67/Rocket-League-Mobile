@@ -2,8 +2,8 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// Put on the car prefab with NetworkObject, NetworkTransform and Rigidbody.
-/// The server simulates the car; each owning client sends its mobile input.
+/// Put on the car Player Prefab with NetworkObject, NetworkTransform,
+/// NetworkRigidbody and Rigidbody. The server simulates movement.
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
 public class NetworkedCarController : NetworkBehaviour
@@ -21,9 +21,12 @@ public class NetworkedCarController : NetworkBehaviour
     [SerializeField] private float boostRecharge = 0.35f;
 
     private Rigidbody body;
-    private float throttleInput;
-    private float steeringInput;
-    private bool boostInput;
+    private float localThrottle;
+    private float localSteering;
+    private bool localBoost;
+    private float serverThrottle;
+    private float serverSteering;
+    private bool serverBoost;
     private float boostFuel;
 
     private void Awake()
@@ -35,65 +38,64 @@ public class NetworkedCarController : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsOwner)
-            return;
+        if (!IsOwner) return;
 
-        float throttle = 0f;
-        float steering = 0f;
-        bool boost = false;
-
-        // Keyboard fallback for editor testing; mobile buttons can call the public setters.
 #if UNITY_EDITOR || UNITY_STANDALONE
-        throttle = Input.GetAxisRaw("Vertical");
-        steering = Input.GetAxisRaw("Horizontal");
-        boost = Input.GetKey(KeyCode.Space);
+        localThrottle = Input.GetAxisRaw("Vertical");
+        localSteering = Input.GetAxisRaw("Horizontal");
+        localBoost = Input.GetKey(KeyCode.Space);
 #endif
-        SubmitInputServerRpc(throttle, steering, boost);
+        SubmitInputServerRpc(localThrottle, localSteering, localBoost);
     }
 
     public void SetMobileThrottle(float value)
     {
-        if (IsOwner) SubmitInputServerRpc(Mathf.Clamp(value, -1f, 1f), steeringInput, boostInput);
+        if (!IsOwner) return;
+        localThrottle = Mathf.Clamp(value, -1f, 1f);
+        SubmitInputServerRpc(localThrottle, localSteering, localBoost);
     }
 
     public void SetMobileSteering(float value)
     {
-        if (IsOwner) SubmitInputServerRpc(throttleInput, Mathf.Clamp(value, -1f, 1f), boostInput);
+        if (!IsOwner) return;
+        localSteering = Mathf.Clamp(value, -1f, 1f);
+        SubmitInputServerRpc(localThrottle, localSteering, localBoost);
     }
 
     public void SetMobileBoost(bool value)
     {
-        if (IsOwner) SubmitInputServerRpc(throttleInput, steeringInput, value);
+        if (!IsOwner) return;
+        localBoost = value;
+        SubmitInputServerRpc(localThrottle, localSteering, localBoost);
     }
 
     [ServerRpc]
     private void SubmitInputServerRpc(float throttle, float steering, bool boost)
     {
-        throttleInput = Mathf.Clamp(throttle, -1f, 1f);
-        steeringInput = Mathf.Clamp(steering, -1f, 1f);
-        boostInput = boost;
+        serverThrottle = Mathf.Clamp(throttle, -1f, 1f);
+        serverSteering = Mathf.Clamp(steering, -1f, 1f);
+        serverBoost = boost;
     }
 
     private void FixedUpdate()
     {
-        if (!IsServer)
-            return;
+        if (!IsServer) return;
 
         float forwardSpeed = Vector3.Dot(body.linearVelocity, transform.forward);
-        if (throttleInput > 0f && forwardSpeed < maxSpeed)
-            body.AddForce(transform.forward * throttleInput * acceleration, ForceMode.Acceleration);
-        else if (throttleInput < 0f)
-            body.AddForce(transform.forward * throttleInput * reverseAcceleration, ForceMode.Acceleration);
+        if (serverThrottle > 0f && forwardSpeed < maxSpeed)
+            body.AddForce(transform.forward * serverThrottle * acceleration, ForceMode.Acceleration);
+        else if (serverThrottle < 0f)
+            body.AddForce(transform.forward * serverThrottle * reverseAcceleration, ForceMode.Acceleration);
 
         float speedFactor = Mathf.Clamp01(body.linearVelocity.magnitude / 3f);
         float direction = forwardSpeed >= -0.5f ? 1f : -1f;
-        float turn = steeringInput * turnSpeed * speedFactor * direction * Time.fixedDeltaTime;
+        float turn = serverSteering * turnSpeed * speedFactor * direction * Time.fixedDeltaTime;
         body.MoveRotation(body.rotation * Quaternion.Euler(0f, turn, 0f));
 
         Vector3 sideways = Vector3.Project(body.linearVelocity, transform.right);
         body.AddForce(-sideways * grip, ForceMode.Acceleration);
 
-        if (boostInput && boostFuel > 0f)
+        if (serverBoost && boostFuel > 0f)
         {
             body.AddForce(transform.forward * boostForce, ForceMode.Acceleration);
             boostFuel = Mathf.Max(0f, boostFuel - Time.fixedDeltaTime);
