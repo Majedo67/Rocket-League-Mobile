@@ -15,6 +15,10 @@ public class NetworkedBall : NetworkBehaviour
     private void Awake()
     {
         body = GetComponent<Rigidbody>();
+    }
+
+    public override void OnNetworkSpawn()
+    {
         startingPosition = transform.position;
         startingRotation = transform.rotation;
     }
