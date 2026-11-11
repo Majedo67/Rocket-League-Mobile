@@ -1,26 +1,26 @@
 using UnityEngine;
 
 /// <summary>
-/// Connect this to the Online Play and Leave Match buttons in the Unity UI.
+/// Connect the Online Play and Leave buttons to these methods in the Inspector.
 /// </summary>
 public class OnlineMenuButton : MonoBehaviour
 {
-    [SerializeField] private OnlineMatchBootstrap onlineMatch;
+    [SerializeField] private UnityNetcodeMatchmaking matchmaking;
 
     public void OnFindMatchPressed()
     {
-        if (onlineMatch == null)
+        if (matchmaking == null)
         {
-            Debug.LogError("Assign OnlineMatchBootstrap in the Inspector.");
+            Debug.LogError("Assign UnityNetcodeMatchmaking in the Inspector.");
             return;
         }
 
-        onlineMatch.FindMatch();
+        matchmaking.FindRandomMatch();
     }
 
     public void OnLeaveMatchPressed()
     {
-        if (onlineMatch != null)
-            onlineMatch.LeaveMatch();
+        if (matchmaking != null)
+            matchmaking.LeaveMatch();
     }
 }
