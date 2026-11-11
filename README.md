@@ -1,23 +1,26 @@
 # Rocket League Mobile
 
-An independent car-football prototype for iPhone, built with original code and assets.
+An independent car-soccer prototype for iPhone using original code and assets.
 
-## Current prototype code
-- 3D car driving and boost controller
-- Touchscreen driving controls
-- Follow camera
-- Goal trigger and local match timer/score
-- Unity Netcode for GameObjects online car controller
-- Unity Lobby + Relay public matchmaking starter
-- Networked ball, goals, replicated score and timer starter
-- Online match HUD
+## Unity project
+- Unity Editor: 6000.0.42f1
+- Main scene: Assets/Scenes/Main.unity
+- Runtime prototype: procedural arena, two cars, ball, touch controls and follow camera
+- Online starter: Unity Netcode for GameObjects + Unity Lobby + Unity Relay (no Photon)
 
-## Online multiplayer
-The project uses **Unity Netcode for GameObjects + Unity Lobby + Unity Relay**. It does not use Photon. Players will be able to find public matches from inside the game without opening a website once the Unity scene, prefabs, services and networking setup are completed.
+Open this repository folder with Unity Hub. Unity will resolve packages from Packages/manifest.json.
 
-See [Online multiplayer setup](Assets/Scripts/Online/README.md).
+## iOS build
+GitHub Actions workflow: .github/workflows/build.yml
 
-## Important project status
-This repository currently contains prototype scripts and setup notes, not a complete Unity project or a finished game. Unity scenes, prefabs, project settings, package configuration, testing, and the iOS build/signing process still need to be completed before an installable IPA can be produced.
+Run it from **Actions → iOS IPA Build → Run workflow**. Add these repository secrets before running:
+- UNITY_LICENSE
+- UNITY_EMAIL
+- UNITY_PASSWORD
 
-This is an independent project and is not affiliated with or endorsed by Psyonix or Epic Games. It will use original code and assets.
+The workflow exports an iOS Xcode project. An installable IPA additionally needs a valid Apple signing certificate and provisioning profile for the app's bundle ID. This repository does not contain Apple credentials.
+
+## Online multiplayer status
+Online scripts are starter code and still need scene/prefab NetworkObject configuration, Unity Gaming Services project setup, and device testing. The local practice prototype is separate from fully working online matchmaking.
+
+This is an independent project and is not affiliated with Psyonix or Epic Games.
